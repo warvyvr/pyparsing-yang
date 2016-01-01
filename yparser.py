@@ -5,6 +5,7 @@ from pyparsing import *
 #TODO
 # 1.xpath string doesn't define well
 # 2.namespace string doesn't define well
+# 3.description doesn't support multi-lines way.
 
 
 semicolon = Suppress(Literal(";"))
@@ -18,51 +19,78 @@ def removeColon(token):
 	print(token)
 	return token[:-1]
 
-# maching keyword <value> ; 
-def simple_stmt(keyword, matching):
-	return Suppress(Literal(keyword)) + matching.setResultsName(keyword) + semicolon
+#########################################################################
+#  common statements definition
+#########################################################################
 
-def simple_string_stmt(keyword, matching):
-  matching_local = matching.setResultsName(keyword)
-  return Suppress(Literal(keyword)) + dqm + matching_local + dqm + semicolon
-
+date_stmt = Word(nums+"-")
 name_stmt = Word(alphas+"\"-_:"+nums)
 
-# namespace <namespace>;
-namespace_stmt = Suppress(Literal("namespace")) + name_stmt.setResultsName("namespace") + semicolon
-
-# prefix <prefix>;
-prefix_stmt= Suppress(Literal("prefix")) + name_stmt.setResultsName("prefix")+ semicolon
-
-
-# import <import_module> { prefix <prefix>; }
-import_stmt = Group(Suppress(Literal("import")) + name_stmt.setResultsName("import_module") + lbrace \
-                + prefix_stmt + rbrace)
-
-# organization "<organization>";
-
-organization_stmt = Suppress(Literal("organization")) + Word(printables.replace(";","")+" ").setResultsName("organization") + semicolon
-
-yang_version_stmt = Group(Suppress(Literal("yang-version")) + Literal("1").setResultsName("version") + semicolon).setResultsName("yang-version)")
 
 description = Word(printables.replace(";","")+" ").setResultsName("description")
 description_stmt = Suppress(Literal("description")) + description + semicolon
+
+revision_date_stmt = Suppress(Literal("revision-date")) + Word(nums+"@:/ ").setResultsName("revision-date") \
+                      + semicolon
+
+xpath_stmt = Word(printables.replace(";",""))
+
+path_stmt = Suppress(Literal("path")) + xpath_stmt + semicolon
+
+#########################################################################
+#  module header statements definition
+#########################################################################
+yang_version_stmt = Group(Suppress(Literal("yang-version")) + Literal("1").setResultsName("version") \
+                    + semicolon).setResultsName("yang-version)")
+
+namespace_stmt = Suppress(Literal("namespace")) + name_stmt.setResultsName("namespace") + semicolon
+
+prefix_stmt= Suppress(Literal("prefix")) + name_stmt.setResultsName("prefix")+ semicolon
+
+
+module_header_stmts = Optional(yang_version_stmt) + OneOrMore((namespace_stmt | prefix_stmt))
+
+#########################################################################
+#  linkage statements definition
+#########################################################################
+import_stmt = Group(Suppress(Literal("import")) + name_stmt.setResultsName("import_module") + lbrace \
+                + prefix_stmt + Optional(revision_date_stmt) + rbrace).setResultsName("import")
+
+include_stmt = Group(Suppress(Literal("include")) + name_stmt.setResultsName("include_module") + lbrace \
+                + prefix_stmt + Optional(revision_date_stmt) + rbrace).setResultsName("include")
+
+
+linkage_stmts = ZeroOrMore(import_stmt | include_stmt).setResultsName("imports")
+
+#########################################################################
+#  meta statements definition
+#########################################################################
+organization_stmt = Suppress(Literal("organization")) \
+                      + Word(printables.replace(";","")+" ").setResultsName("organization") + semicolon
 
 contact_stmt = Suppress(Literal("contact")) + Word(printables.replace(";","")+" ").setResultsName("contact") + semicolon
 
 reference_stmt = Group(Suppress(Literal("reference")) + Word(printables.replace(";","")+" ") + semicolon)
 
-module_header_stmts = Optional(yang_version_stmt) + OneOrMore((namespace_stmt | prefix_stmt))
 
-linkage_stmts = ZeroOrMore(import_stmt).setResultsName("imports")
+meta_stmts = (organization_stmt | contact_stmt | description_stmt | reference_stmt) * (0,4)
 
-meta_stmts = (organization_stmt | contact_stmt | contact_stmt | reference_stmt) * (0,4)
+#########################################################################
+#  revision statements definition
+#########################################################################
+revision_stmts = Suppress(Literal("revision")) + date_stmt.setResultsName("revision") \
+                  + lbrace \
+                    + description_stmt \
+                    + reference_stmt \
+                  + rbrace
 
-xpath_stmt = Word(printables.replace(";",""))
-path_stmt = Suppress(Literal("path")) + xpath_stmt + semicolon
 
+#########################################################################
+#  body statements definition
+#########################################################################
 
 typedef_name = Word(alphas+nums+"-")
+
 base_type_name = Word(alphas+nums+"-")
 
 typedef_stmt = Group(Suppress(Literal("typedef")) + typedef_name.setResultsName("typedef_name") + lbrace \
@@ -74,9 +102,19 @@ typedef_stmt = Group(Suppress(Literal("typedef")) + typedef_name.setResultsName(
 
 typedef_stmt = typedef_stmt.setResultsName("typedef")
 
-yang_model = Suppress(Literal("module"))  + name_stmt.setResultsName("module_name") + lbrace  \
-                + module_header_stmts + linkage_stmts + meta_stmts \
-                + ZeroOrMore(typedef_stmt).setResultsName("typedefs") \
+
+body_stmts = ZeroOrMore(typedef_stmt)
+
+#########################################################################
+#  yang parer definition
+#########################################################################
+
+yang_parser = Suppress(Literal("module"))  + name_stmt.setResultsName("module_name") + lbrace  \
+                  + module_header_stmts \
+                  + linkage_stmts \
+                  + meta_stmts \
+                  + Optional(revision_stmts) \
+                  + body_stmts \
                 + rbrace
 
 demo_string = """
@@ -113,7 +151,7 @@ module ietf-interfaces {
 
 #result = module_mandatory.parseString(demo_string2)
 
-result = yang_model.parseString(demo_string)
+result = yang_parser.parseString(demo_string)
 
 #result = organization_stmt.parseString(demo_string3)
 print(result)
@@ -127,8 +165,8 @@ for imp in result.imports.asList():
 print("organization: %s" %(result.organization))
 print("contact: ", result.contact)
 
-for t in result.typedefs.asList():
-  print("--->", t)
+#for t in result.typedefs.asList():
+#  print("--->", t)
 
 
 print(result.asXML())
@@ -175,3 +213,12 @@ list_sexp << ((Suppress(("container")) + Word(alphas+nums).setResultsName("conta
              (Suppress(("list")) + Word(alphas+nums).setResultsName("list") + lbrace + key_stmt + OneOrMore(leaf_stmt).setResultsName("leaves") + Group(ZeroOrMore(list_sexp)) + rbrace))
 
 print(list_sexp.parseString(nested_string).asXML())
+
+
+if "__main__" == __name__:
+
+  if (len(sys.argv) > 1):
+    with open(sys.argv[1]) as yang_file:
+      content = yang_file.read()
+      result = yang_parser.parseString(content)
+      print(result)

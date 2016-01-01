@@ -1,2 +1,2 @@
 # pyparsing-yang
-The repo is used to implement a yang parser based on pyparsing
+pyparsing-yang is designed to implement a yang front-end parser based on python and pyparsing.
