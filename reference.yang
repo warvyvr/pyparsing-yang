@@ -1,0 +1,31 @@
+module reference {
+  yang-version 1;
+  prefix reference;  
+  namespace "urn:ietf:params:xml:ns:yang:reference";
+
+  import ietf-yang-types {
+      prefix ytypes;
+  }
+
+  import reference-types {
+      prefix rtypes;
+  }
+
+  include reference-module {
+    prefix rmodule;
+  }
+
+  import reference-types2 {
+      prefix rtypes2;
+  }
+
+
+  organization "pyparsing yang parser team";
+  
+  contact "warvyvr";
+
+  description "the reference yang model is deisged to cover basic yang grammer.";
+
+  reference "reference description";
+
+}
