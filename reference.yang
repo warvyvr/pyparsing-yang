@@ -24,8 +24,60 @@ module reference {
   
   contact "warvyvr";
 
-  description "the reference yang model is deisged to cover basic yang grammer.";
+  description "the reference yang model is deisged to cover 
+               basic yang grammer.";
 
   reference "reference description";
 
+  list country {
+    key "name";
+    leaf name {
+      type string;
+    }
+    container goverment {
+      container president {
+        leaf name {
+          type string;
+        }        
+      }
+    }
+
+    list state {
+      key "name";
+      leaf name {
+        type string;
+      }
+
+      container goverment {
+        container governor_of_state {
+          leaf name {
+            type string;
+          }
+        }
+      }
+
+      list city {
+        key "name";
+        leaf name {
+          type string;
+        }
+
+        container goverment {
+          container major {
+            leaf name {
+              type string;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  leaf demension {
+    type int;
+  }
+
+  leaf demension2 {
+    type int;
+  }
 }

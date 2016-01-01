@@ -8,9 +8,7 @@ from pyparsing import *
 # 3.description doesn't support multi-lines way.
 
 
-semicolon = Suppress(Literal(";"))
-lbrace = Suppress(Literal("{"))
-rbrace = Suppress(Literal("}"))
+semi,lbrace,rbrace = map(Suppress,";{}")
 
 #double quotation marks
 dqm = Suppress(Literal('"'))
@@ -23,29 +21,31 @@ def removeColon(token):
 #  common statements definition
 #########################################################################
 
+identifier_stmt = Word(alphas+nums+"_-.")
+
 date_stmt = Word(nums+"-")
 name_stmt = Word(alphas+"\"-_:"+nums)
 
+dblQContent =  dblQuotedString.setParseAction(removeQuotes)
 
-description = Word(printables.replace(";","")+" ").setResultsName("description")
-description_stmt = Suppress(Literal("description")) + description + semicolon
+description_stmt = Suppress(Keyword("description")) + QuotedString('"',multiline=True).setResultsName("description") + semi
 
-revision_date_stmt = Suppress(Literal("revision-date")) + Word(nums+"@:/ ").setResultsName("revision-date") \
-                      + semicolon
+revision_date_stmt = Suppress(Keyword("revision-date")) + Word(nums+"@:/ ").setResultsName("revision-date") \
+                      + semi
 
-xpath_stmt = Word(printables.replace(";",""))
+xpath_stmt = dblQContent.setResultsName("xpath")
 
-path_stmt = Suppress(Literal("path")) + xpath_stmt + semicolon
+path_stmt = Suppress(Keyword("path")) + xpath_stmt + semi
 
 #########################################################################
 #  module header statements definition
 #########################################################################
-yang_version_stmt = Group(Suppress(Literal("yang-version")) + Literal("1").setResultsName("version") \
-                    + semicolon).setResultsName("yang-version)")
+yang_version_stmt = Group(Suppress(Keyword("yang-version")) + Literal("1").setResultsName("version") \
+                    + semi).setResultsName("yang-version)")
 
-namespace_stmt = Suppress(Literal("namespace")) + name_stmt.setResultsName("namespace") + semicolon
+namespace_stmt = Suppress(Keyword("namespace")) + name_stmt.setResultsName("namespace") + semi
 
-prefix_stmt= Suppress(Literal("prefix")) + name_stmt.setResultsName("prefix")+ semicolon
+prefix_stmt= Suppress(Keyword("prefix")) + name_stmt.setResultsName("prefix")+ semi
 
 
 module_header_stmts = Optional(yang_version_stmt) + OneOrMore((namespace_stmt | prefix_stmt))
@@ -53,10 +53,10 @@ module_header_stmts = Optional(yang_version_stmt) + OneOrMore((namespace_stmt | 
 #########################################################################
 #  linkage statements definition
 #########################################################################
-import_stmt = Group(Suppress(Literal("import")) + name_stmt.setResultsName("import_module") + lbrace \
+import_stmt = Group(Suppress(Keyword("import")) + name_stmt.setResultsName("import_module") + lbrace \
                 + prefix_stmt + Optional(revision_date_stmt) + rbrace).setResultsName("import")
 
-include_stmt = Group(Suppress(Literal("include")) + name_stmt.setResultsName("include_module") + lbrace \
+include_stmt = Group(Suppress(Keyword("include")) + name_stmt.setResultsName("include_module") + lbrace \
                 + prefix_stmt + Optional(revision_date_stmt) + rbrace).setResultsName("include")
 
 
@@ -65,12 +65,12 @@ linkage_stmts = ZeroOrMore(import_stmt | include_stmt).setResultsName("imports")
 #########################################################################
 #  meta statements definition
 #########################################################################
-organization_stmt = Suppress(Literal("organization")) \
-                      + Word(printables.replace(";","")+" ").setResultsName("organization") + semicolon
+organization_stmt = Suppress(Keyword("organization")) \
+                      + dblQContent.setResultsName("organization") + semi
 
-contact_stmt = Suppress(Literal("contact")) + Word(printables.replace(";","")+" ").setResultsName("contact") + semicolon
+contact_stmt = Suppress(Keyword("contact")) + dblQContent.setResultsName("contact") + semi
 
-reference_stmt = Group(Suppress(Literal("reference")) + Word(printables.replace(";","")+" ") + semicolon)
+reference_stmt = Group(Suppress(Keyword("reference")) + dblQContent.setResultsName("reference") + semi)
 
 
 meta_stmts = (organization_stmt | contact_stmt | description_stmt | reference_stmt) * (0,4)
@@ -78,7 +78,7 @@ meta_stmts = (organization_stmt | contact_stmt | description_stmt | reference_st
 #########################################################################
 #  revision statements definition
 #########################################################################
-revision_stmts = Suppress(Literal("revision")) + date_stmt.setResultsName("revision") \
+revision_stmts = Suppress(Keyword("revision")) + date_stmt.setResultsName("revision") \
                   + lbrace \
                     + description_stmt \
                     + reference_stmt \
@@ -93,23 +93,49 @@ typedef_name = Word(alphas+nums+"-")
 
 base_type_name = Word(alphas+nums+"-")
 
-typedef_stmt = Group(Suppress(Literal("typedef")) + typedef_name.setResultsName("typedef_name") + lbrace \
-                   + Suppress(Literal("type")) + base_type_name.setResultsName("basetype_name") + lbrace \
-                     + path_stmt      \
-                   + rbrace           \
-                   + description_stmt   \
+typedef_stmt = Group(Suppress(Keyword("typedef")) + typedef_name.setResultsName("typedef_name") + lbrace \
+                   + Suppress(Keyword("type")) + base_type_name.setResultsName("basetype_name") + lbrace \
+                     + path_stmt          \
+                   + rbrace               \
+                   + description_stmt     \
                  + rbrace)
 
 typedef_stmt = typedef_stmt.setResultsName("typedef")
 
+leaf_stmt = Suppress(Keyword("leaf")) + identifier_stmt.setResultsName("name") + lbrace \
+              + Suppress(Keyword("type")) + Word(alphas+nums+"-").setResultsName("type_name") + semi \
+              + Optional(Suppress(Keyword("mandatory")) + Or("true","false") + semi) \
+              + Optional(Suppress(Keyword("default")) + Word(alphas+nums+"-\"") + semi) \
+            + rbrace
 
-body_stmts = ZeroOrMore(typedef_stmt)
+key_stmt = Suppress(Keyword("key")) + dblQContent.setResultsName("name") + semi
+
+list_sexp = Forward()
+
+
+list_stmt = Suppress(Keyword("list")) + identifier_stmt.setResultsName("name") + lbrace \
+                + key_stmt \
+                + OneOrMore(leaf_stmt.setResultsName("leaf"))\
+                + ZeroOrMore(list_sexp) \
+              + rbrace
+
+container_stmt = Suppress(Keyword("container")) + identifier_stmt.setResultsName("name") + lbrace \
+                    + ZeroOrMore(leaf_stmt.setResultsName("leaf"))\
+                    + ZeroOrMore(list_sexp) \
+                  + rbrace
+
+list_sexp << (Group(list_stmt).setResultsName("list") | Group(container_stmt).setResultsName("container"))
+
+data_def_stmt = list_sexp | leaf_stmt
+
+
+body_stmts = ZeroOrMore(typedef_stmt | data_def_stmt)
 
 #########################################################################
 #  yang parer definition
 #########################################################################
 
-yang_parser = Suppress(Literal("module"))  + name_stmt.setResultsName("module_name") + lbrace  \
+yang_parser = Suppress(Keyword("module"))  + name_stmt.setResultsName("module_name") + lbrace  \
                   + module_header_stmts \
                   + linkage_stmts \
                   + meta_stmts \
@@ -202,11 +228,11 @@ list l1 {
 """
 
 leaf_stmt = Suppress("leaf") + Word(alphas+nums+"_-").setResultsName("leaf_name") + lbrace \
-              + Suppress("type") + Word(alphas+nums+"-").setResultsName("type_name") + semicolon \
-              + Optional(Suppress("mandatory") + Or("true","false") + semicolon) \
-              + Optional(Suppress("default") + Word(alphas+nums+"-\"") + semicolon) \
+              + Suppress("type") + Word(alphas+nums+"-").setResultsName("type_name") + semi \
+              + Optional(Suppress("mandatory") + Or("true","false") + semi) \
+              + Optional(Suppress("default") + Word(alphas+nums+"-\"") + semi) \
             + rbrace
-key_stmt = Suppress("key") + Word(alphas+nums+"\"-").setResultsName("key_name") + semicolon
+key_stmt = Suppress("key") + Word(alphas+nums+"\"-").setResultsName("key_name") + semi
 
 list_sexp = Forward()
 list_sexp << ((Suppress(("container")) + Word(alphas+nums).setResultsName("container") + lbrace + ZeroOrMore(leaf_stmt).setResultsName("leaves") + Group(ZeroOrMore(list_sexp)) + rbrace) | \
