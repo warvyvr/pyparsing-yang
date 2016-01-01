@@ -110,23 +110,27 @@ leaf_stmt = Suppress(Keyword("leaf")) + identifier_stmt.setResultsName("name") +
 
 key_stmt = Suppress(Keyword("key")) + dblQContent.setResultsName("name") + semi
 
+leaf_list_stmt = Suppress(Keyword("leaf-list")) + identifier_stmt.setResultsName("name") + lbrace \
+              + Suppress(Keyword("type")) + Word(alphas+nums+"-").setResultsName("type_name") + semi \
+              + Optional(Suppress(Keyword("mandatory")) + Or("true","false") + semi) \
+              + Optional(Suppress(Keyword("default")) + Word(alphas+nums+"-\"") + semi) \
+            + rbrace
+
 list_sexp = Forward()
 
 
 list_stmt = Suppress(Keyword("list")) + identifier_stmt.setResultsName("name") + lbrace \
                 + key_stmt \
-                + OneOrMore(leaf_stmt.setResultsName("leaf"))\
-                + ZeroOrMore(list_sexp) \
+                + OneOrMore(leaf_stmt | leaf_list_stmt | list_sexp) \
               + rbrace
 
 container_stmt = Suppress(Keyword("container")) + identifier_stmt.setResultsName("name") + lbrace \
-                    + ZeroOrMore(leaf_stmt.setResultsName("leaf"))\
-                    + ZeroOrMore(list_sexp) \
+                    + ZeroOrMore(leaf_stmt | leaf_list_stmt | list_sexp) \
                   + rbrace
 
 list_sexp << (Group(list_stmt).setResultsName("list") | Group(container_stmt).setResultsName("container"))
 
-data_def_stmt = list_sexp | leaf_stmt
+data_def_stmt = list_sexp | leaf_stmt | leaf_list_stmt
 
 
 body_stmts = ZeroOrMore(typedef_stmt | data_def_stmt)

@@ -68,6 +68,9 @@ module reference {
               type string;
             }
           }
+          leaf-list deputy_major {
+            type string;
+          }
         }
       }
     }
@@ -75,6 +78,10 @@ module reference {
 
   leaf demension {
     type int;
+  }
+
+  leaf-list oceans {
+    type string;
   }
 
   leaf demension2 {
