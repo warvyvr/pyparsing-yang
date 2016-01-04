@@ -52,6 +52,7 @@ module reference {
         container governor_of_state {
           leaf name {
             type string;
+            when "abc";
           }
         }
       }
@@ -60,11 +61,17 @@ module reference {
         key "name";
         leaf name {
           type string;
+          if-feature city-feature;
+          mandatory true;
         }
 
         container goverment {
           container major {
             leaf name {
+              when "bcd---ddd" {
+                reference "aaa";
+                description "ccccc";
+              }
               type string;
             }
           }
